@@ -1,13 +1,26 @@
 # awespottr
-## Find the cheapest EC2 spot prices across all regions
+> Find the cheapest EC2 spot prices across all regions
 
-Usage:
+## Usage
 
-- `node cli.js <ec2 type>`
+When installed globally with `npm install -g awespottr`, you can run
+awespottr on the command line:
 
-- `AWS_PROFILE=awespottr node cli.js g2.8xlarge`
+- Get help: `awespottr -h`
 
-Minimal IAM policy:
+- Get spot prices for a g2.8xlarge instance: `awespottr g2.8xlarge`
+
+- Specify an AWS CLI profile (credentials):
+`AWS_PROFILE=awespottr awespottr m4.large`
+
+- Limit results to a specific region: `awespottr --region us-west-2 c4.xlarge`
+
+## IAM Policy
+
+awespottr must be run with an IAM role or user with permissions to get
+information about AWS regions, availability zones, and spot price history.
+
+This IAM policy contains the minimum permissions required for running awespottr:
 
 ```
 {
@@ -29,7 +42,9 @@ Minimal IAM policy:
 }
 ```
 
-Example output:
+## Example Output
+
+Running `awespottr m4.2xlarge` should produce output like:
 
 ```
 Checking spot prices for m4.2xlarge instance type.
