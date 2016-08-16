@@ -1,6 +1,8 @@
 # awespottr
 > Find the cheapest EC2 spot prices across all regions
 
+[![npmjs.com Version](https://img.shields.io/npm/v/awespottr.svg?maxAge=2592000)](https://www.npmjs.com/package/awespottr)
+
 ## Usage
 
 When installed globally with `npm install -g awespottr`, you can run
