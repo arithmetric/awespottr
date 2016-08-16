@@ -15,12 +15,13 @@ var lowZone = false;
 program
   .version('0.1.0')
   .usage('[options] <EC2 instance types ...>')
+  .option('-r, --region <AWS region>', 'Limit to the given region')
   .action(function(type) {
     ec2Type = type;
   })
   .parse(process.argv);
 
-console.log('Checking spot prices for ' + ec2Type + ' instance type.\n');
+console.log('Checking spot prices for ' + ec2Type + ' instance type.');
 
 function getRegions() {
   return new Promise(function(resolve, reject) {
@@ -82,23 +83,34 @@ function getRegionSpots(regionName) {
   });
 }
 
-getRegions()
-  .then(function() {
-    console.log(_.padEnd('AWS Zone', 24) + ' ' + _.padEnd('Hourly Rate', 12));
-    console.log(_.pad('', 24, '-') + ' ' + _.pad('', 12, '-'));
-    var sortedZones = _.values(zones);
-    sortedZones = _.sortBy(sortedZones, function(val) { return Number(val.lastPrice); }, 'zone');
-    _.each(sortedZones, function(data) {
-      var msg = _.padEnd(data.zone, 24) + ' ' + _.padEnd('$' + data.lastPrice, 12);
-      if (data.zone === lowZone || data.lastPrice === lowPrice) {
-        msg = chalk.green(msg);
-      } else if (lowPrice * 1.1 >= data.lastPrice) {
-        msg = chalk.yellow(msg);
-      }
-      console.log(msg);
-    });
-    console.log(chalk.green('\nCheapest hourly rate for ' + ec2Type + ' is $' + lowPrice + ' in zone ' + lowZone));
-  })
-  .catch(function(err) {
-    console.log('error', err);
+function handleResults() {
+  console.log('\n' + _.padEnd('AWS Zone', 24) + ' ' + _.padEnd('Hourly Rate', 12));
+  console.log(_.pad('', 24, '-') + ' ' + _.pad('', 12, '-'));
+  var sortedZones = _.values(zones);
+  sortedZones = _.sortBy(sortedZones, function(val) { return Number(val.lastPrice); }, 'zone');
+  _.each(sortedZones, function(data) {
+    var msg = _.padEnd(data.zone, 24) + ' ' + _.padEnd('$' + data.lastPrice, 12);
+    if (data.zone === lowZone || data.lastPrice === lowPrice) {
+      msg = chalk.green(msg);
+    } else if (lowPrice * 1.1 >= data.lastPrice) {
+      msg = chalk.yellow(msg);
+    }
+    console.log(msg);
   });
+  console.log(chalk.green('\nCheapest hourly rate for ' + ec2Type + ' is $' + lowPrice + ' in zone ' + lowZone));
+}
+
+if (program.region) {
+  console.log('Limiting results to region ' + program.region);
+  getRegionSpots(program.region)
+    .then(handleResults)
+    .catch(function(err) {
+      console.log('error', err);
+    });
+} else {
+  getRegions(program.region)
+    .then(handleResults)
+    .catch(function(err) {
+      console.log('error', err);
+    });
+}
