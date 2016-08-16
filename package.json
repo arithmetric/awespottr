@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Find the cheapest EC2 spot prices in any region.",
   "main": "cli.js",
+  "bin": {
+    "awespottr": "./cli.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

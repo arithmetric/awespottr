@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 var _ = require('lodash');
 var AWS = require('aws-sdk');
 var chalk = require('chalk');
