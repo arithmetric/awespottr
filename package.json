@@ -1,6 +1,6 @@
 {
   "name": "awespottr",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Find the cheapest EC2 spot prices in any region.",
   "main": "cli.js",
   "bin": {

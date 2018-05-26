@@ -13,7 +13,7 @@ var lowPrice = false;
 var lowZone = false;
 
 program
-  .version('0.2.0')
+  .version('0.3.0')
   .usage('[options] <EC2 instance types ...>')
   .option('-r, --region <AWS region>', 'Limit to the given region')
   .action(function(type) {
