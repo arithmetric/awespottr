@@ -70,8 +70,8 @@ function getRegionSpots(regionName) {
                 lastPrice: sdata.SpotPrice,
                 zone: sdata.AvailabilityZone
               };
-              if (!lowPrice || sdata.SpotPrice < lowPrice) {
-                lowPrice = sdata.SpotPrice;
+              if (!lowPrice || Number(sdata.SpotPrice) < lowPrice) {
+                lowPrice = Number(sdata.SpotPrice);
                 lowZone = sdata.AvailabilityZone;
               }
             }
