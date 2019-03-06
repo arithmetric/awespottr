@@ -1,13 +1,13 @@
 {
   "name": "awespottr",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Find the cheapest EC2 spot prices in any region.",
   "main": "cli.js",
   "bin": {
     "awespottr": "./cli.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha test-cli.js"
   },
   "author": "Joe Turgeon <arithmetric@gmail.com>",
   "license": "MIT",
@@ -17,5 +17,11 @@
     "commander": "^2.9.0",
     "lodash": "^4.14.1",
     "moment": "^2.14.1"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "chai-diff": "^1.0.1",
+    "mocha": "^6.0.2",
+    "sinon": "^7.2.7"
   }
 }
