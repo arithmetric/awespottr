@@ -6,82 +6,81 @@ var chalk = require('chalk');
 var moment = require('moment');
 var program = require('commander');
 
-var ec2Type = [];
-var awsRegions = {};
-var zones = {};
 var lowPrice = false;
 var lowZone = false;
 
-function getRegions() {
+exports.getRegions = function (instanceTypes) {
   return new Promise(function(resolve, reject) {
-    var ec2 = new AWS.EC2({apiVersion: '2016-04-01', region: 'us-west-2'});
+    var ec2 = new AWS.EC2({apiVersion: '2016-04-01', region: 'us-east-2'});
     ec2.describeRegions({}, function(err, data) {
       if (err) {
-        console.log(err, err.stack);
-        return reject(err);
+        reject(err);
+        return;
       }
-
-      var promises = [];
       if (data && data.Regions) {
-        _.each(data.Regions, function(region) {
-          if (region.RegionName && !awsRegions.hasOwnProperty(region.RegionName)) {
-            awsRegions[region.RegionName] = {};
-            promises.push(getRegionSpots(region.RegionName));
-          }
-        })
+        var promises = _.map(data.Regions, region => exports.getRegionSpots(region, instanceTypes))
+        Promise.all(promises).then(resolve).catch(reject);
       }
-      return Promise.all(promises).then(resolve);
     });
-  });
+  }).then(_.flatten);
 }
 
-function getRegionSpots(regionName) {
+function uniqByZoneAndType(instances) {
+  return _.uniqBy(instances, i => i.zone + " " + i.itype)
+}
+
+exports.getRegionSpots = function (region, instanceTypes) {
   return new Promise(function(resolve, reject) {
-    var ec2 = new AWS.EC2({apiVersion: '2016-04-01', region: regionName});
+    if (!region.RegionName) {
+      resolve();
+      return;
+    }
+    var ec2 = new AWS.EC2({apiVersion: '2016-04-01', region: region.RegionName});
     var params = {
-      InstanceTypes: ec2Type,
+      InstanceTypes: instanceTypes,
       ProductDescriptions: ['Linux/UNIX', 'Linux/UNIX (Amazon VPC)'],
       StartTime: moment().subtract(4, 'hours').utc().toDate()
     };
     ec2.describeSpotPriceHistory(params, function(err, data) {
       if (err) {
-        console.log(err, err.stack);
-        return reject(err);
+        if (err.code && err.code === 'AuthFailure') {
+          console.error(chalk.red(`Auth failure in region ${region.RegionName}`))
+          resolve()
+        } else {
+          reject(err);
+          return;
+        }
       }
-
       if (data && data.SpotPriceHistory) {
-        _.each(data.SpotPriceHistory, function(sdata) {
+        var instances = _.map(data.SpotPriceHistory, sdata => {
           if (sdata.SpotPrice && sdata.Timestamp && sdata.AvailabilityZone) {
             var sdate = moment(sdata.Timestamp);
-            if (!zones.hasOwnProperty(sdata.AvailabilityZone) || zones[sdata.AvailabilityZone].lastDate < sdate) {
-              zones[sdata.InstanceType + " " + sdata.AvailabilityZone] = {
-                lastDate: sdate,
-                lastPrice: sdata.SpotPrice,
-                zone: sdata.AvailabilityZone,
-                itype: sdata.InstanceType
-              };
-              if (!lowPrice || Number(sdata.SpotPrice) < lowPrice) {
-                lowPrice = Number(sdata.SpotPrice);
-                lowZone = sdata.AvailabilityZone;
-              }
+            if (!lowPrice || Number(sdata.SpotPrice) < lowPrice) {
+              lowPrice = Number(sdata.SpotPrice);
+              lowZone = sdata.AvailabilityZone;
             }
+            return {
+              lastDate: sdate,
+              lastPrice: sdata.SpotPrice,
+              zone: sdata.AvailabilityZone,
+              itype: sdata.InstanceType
+            };
           }
         });
+        resolve(instances);
       }
-      resolve();
     });
-  });
+  }).then(uniqByZoneAndType);
 }
 
-function handleResults() {
+function handleResults (results, instanceTypes) {
   console.log('\n' + _.padEnd('Instance Type', 16) + ' ' + _.padEnd('AWS Zone', 24) + ' ' + _.padEnd('Hourly Rate', 12));
   console.log(_.pad('', 16, '-') + ' ' + _.pad('', 24, '-') + ' ' + _.pad('', 12, '-'));
-  var sortedZones = _.values(zones);
-  sortedZones = _.sortBy(sortedZones, function(val) { return Number(val.lastPrice); }, 'zone');
+  sortedInstances = _.sortBy(results, val => Number(val.lastPrice), 'zone');
   if (program.number > 0) {
-    sortedZones = sortedZones.slice(0, program.number)
+    sortedInstances = sortedInstances.slice(0, program.number)
   }
-  _.each(sortedZones, function(data) {
+  _.each(sortedInstances, function(data) {
     var msg = _.padEnd(data.itype, 16) + ' ' + _.padEnd(data.zone, 24) + ' ' + _.padEnd('$' + data.lastPrice, 12);
     if (data.zone === lowZone && Number(data.lastPrice) === Number(lowPrice)) {
       msg = chalk.green(msg);
@@ -90,13 +89,14 @@ function handleResults() {
     }
     console.log(msg);
   });
-  console.log(chalk.green('\nCheapest hourly rate for [' + ec2Type.join(', ') + '] is $' + lowPrice + ' in zone ' + lowZone));
+  if (lowPrice) {
+    console.log('\n' + chalk.green('Cheapest hourly rate for [' + instanceTypes.join(', ') + '] is $' + lowPrice + ' in zone ' + lowZone));
+  } else {
+    console.log(chalk.yellow('No data found, did you specify a valid instance type?'));
+  }
 }
 
-exports.standalone = function (cb) {
-  ec2Type = [];
-  awsRegions = {};
-  zones = {};
+exports.standalone = function () {
   lowPrice = false;
   lowZone = false;
   program
@@ -104,38 +104,24 @@ exports.standalone = function (cb) {
     .usage('[options] <EC2 instance types ...>')
     .option('-r, --region <AWS region>', 'Limit to the given region')
     .option('-n, --number <number to show>', 'Only show the top few cheapest spots')
-    .action(function(type, othertypes) {
-      ec2Type = []
-      ec2Type.push(type)
-      if (typeof othertypes === 'string' || othertypes instanceof String) {
-        ec2Type.push(othertypes)
-      }
-      if (Array.isArray(othertypes)) {
-        ec2Type.concat(othertypes)
-      }
-    })
     .parse(process.argv);
 
-  console.log('Checking spot prices for [' + ec2Type.join(', ') + '] instance type(s).');
+  if (program.args.length == 0) {
+    program.outputHelp()
+    process.exit(1)
+  }
+
+  const instanceTypes = program.args
+  console.log('Checking spot prices for [' + instanceTypes.join(', ') + '] instance type(s).');
 
   if (program.region) {
     console.log('Limiting results to region ' + program.region);
-    getRegionSpots(program.region)
-      .then(handleResults)
-      .then(cb)
-      .catch(function(err) {
-        console.log('error', err);
-      });
+    return exports.getRegionSpots({RegionName: program.region}, instanceTypes).then(_.curryRight(handleResults)(instanceTypes))
   } else {
-    getRegions(program.region)
-      .then(handleResults)
-      .then(cb)
-      .catch(function(err) {
-        console.log('error', err);
-      });
+    return exports.getRegions(instanceTypes).then(_.curryRight(handleResults)(instanceTypes))
   }
 }
 
 if (!module.parent) {
-  exports.standalone()
+  exports.standalone().catch(console.error)
 }

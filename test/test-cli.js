@@ -6,7 +6,7 @@ chai.config.showDiff = true
 const expect = chai.expect
 const sinon = require('sinon')
 const AWS = require('aws-sdk')
-const cli = require('./cli')
+const cli = require('../cli')
 
 const RESULTS = {
   'eu-north-1': {
@@ -152,19 +152,16 @@ class EC2Stub {
 }
 
 describe('Awespottr', function () {
-  beforeEach( function (done) {
+  beforeEach(function () {
     this.sandbox = sinon.createSandbox()
     this.sandbox.stub(AWS, 'EC2').callsFake(args => new EC2Stub(args))
-    const orig = console.log
     this.consoleout = ''
-    this.sandbox.stub(console, 'log').callsFake(a => {
-      this.consoleout += a + "\n"
-    })
-    done()
+    this.sandbox.stub(console, 'log').callsFake(a => this.consoleout += a + "\n")
+    this.sandbox.stub(console, 'error').callsFake(a => this.consoleout += a + "\n")
   })
-  it('does an all-region lookup, single instance type', function (done) {
+  it('does an all-region lookup with a single instance type', function () {
     process.argv = ['node', 'cli.js', 'm5.metal']
-    cli.standalone(() => {
+    return cli.standalone().then(() => {
       this.sandbox.restore()
       expect(this.consoleout).not.to.be.differentFrom(`Checking spot prices for [m5.metal] instance type(s).
 
@@ -179,15 +176,14 @@ m5.metal         us-west-2c               $1.081800
 m5.metal         us-east-1a               $1.088200   
 m5.metal         us-east-1d               $1.088200   
 m5.metal         us-east-1f               $1.088200   
-\u001b[32m
-Cheapest hourly rate for [m5.metal] is $0.9173 in zone eu-north-1c\u001b[39m
+
+\u001b[32mCheapest hourly rate for [m5.metal] is $0.9173 in zone eu-north-1c\u001b[39m
 `)
-      done()
     })
   })
-  it('does a all-region lookup, multiple instance types', function (done) {
-    process.argv = ['node', 'cli.js', 'm5.metal', 'm5.24xlarge', 'm0.fakebox']
-    cli.standalone(() => {
+  it('does a all-region lookup with multiple instance types', function () {
+    process.argv = ['node', 'cli.js', 'm5.metal', 'm5.24xlarge']
+    return cli.standalone().then(() => {
       this.sandbox.restore()
       expect(this.consoleout).not.to.be.differentFrom(`Checking spot prices for [m5.metal, m5.24xlarge] instance type(s).
 
@@ -211,15 +207,14 @@ m5.24xlarge      us-east-1b               $1.457100
 m5.24xlarge      us-east-1c               $1.457100   
 m5.24xlarge      us-west-2b               $1.457100   
 m5.24xlarge      us-west-2c               $1.457100   
-\u001b[32m
-Cheapest hourly rate for [m5.metal, m5.24xlarge] is $0.9173 in zone eu-north-1c\u001b[39m
+
+\u001b[32mCheapest hourly rate for [m5.metal, m5.24xlarge] is $0.9173 in zone eu-north-1c\u001b[39m
 `)
-      done()
     })
   })
-  it('does a single-region lookup, single instance type', function (done) {
+  it('does a single-region lookup with a single instance type', function () {
     process.argv = ['node', 'cli.js', '-r', 'eu-north-1', 'm5.metal']
-    cli.standalone(() => {
+    return cli.standalone().then(() => {
       this.sandbox.restore()
       expect(this.consoleout).not.to.be.differentFrom(`Checking spot prices for [m5.metal] instance type(s).
 Limiting results to region eu-north-1
@@ -229,15 +224,14 @@ Instance Type    AWS Zone                 Hourly Rate
 \u001b[33mm5.metal         eu-north-1a              $0.917300   \u001b[39m
 \u001b[33mm5.metal         eu-north-1b              $0.917300   \u001b[39m
 \u001b[32mm5.metal         eu-north-1c              $0.917300   \u001b[39m
-\u001b[32m
-Cheapest hourly rate for [m5.metal] is $0.9173 in zone eu-north-1c\u001b[39m
+
+\u001b[32mCheapest hourly rate for [m5.metal] is $0.9173 in zone eu-north-1c\u001b[39m
 `)
-      done()
     })
   })
-  it('does a single-region lookup, multiple instance types', function (done) {
-    process.argv = ['node', 'cli.js', '-r', 'eu-north-1', 'm5.metal', 'm5.24xlarge', 'm0.fakebox']
-    cli.standalone(() => {
+  it('does a single-region lookup with multiple instance types', function () {
+    process.argv = ['node', 'cli.js', '-r', 'eu-north-1', 'm5.metal', 'm5.24xlarge']
+    return cli.standalone().then(() => {
       this.sandbox.restore()
       expect(this.consoleout).not.to.be.differentFrom(`Checking spot prices for [m5.metal, m5.24xlarge] instance type(s).
 Limiting results to region eu-north-1
@@ -250,15 +244,14 @@ Instance Type    AWS Zone                 Hourly Rate
 \u001b[33mm5.24xlarge      eu-north-1a              $0.957800   \u001b[39m
 m5.24xlarge      eu-north-1b              $1.457100   
 m5.24xlarge      eu-north-1c              $1.457100   
-\u001b[32m
-Cheapest hourly rate for [m5.metal, m5.24xlarge] is $0.9173 in zone eu-north-1c\u001b[39m
+
+\u001b[32mCheapest hourly rate for [m5.metal, m5.24xlarge] is $0.9173 in zone eu-north-1c\u001b[39m
 `)
-      done()
     })
   })
-  it('does a single-region lookup, multiple instance types, limited to top 3', function (done) {
-    process.argv = ['node', 'cli.js', '-n', '3', '-r', 'eu-north-1', 'm5.metal', 'm5.24xlarge', 'm0.fakebox']
-    cli.standalone(() => {
+  it('does a single-region lookup with multiple instance types limited to the top 3', function () {
+    process.argv = ['node', 'cli.js', '-n', '3', '-r', 'eu-north-1', 'm5.metal', 'm5.24xlarge']
+    return cli.standalone().then(() => {
       this.sandbox.restore()
       expect(this.consoleout).not.to.be.differentFrom(`Checking spot prices for [m5.metal, m5.24xlarge] instance type(s).
 Limiting results to region eu-north-1
@@ -268,10 +261,9 @@ Instance Type    AWS Zone                 Hourly Rate
 \u001b[33mm5.metal         eu-north-1a              $0.917300   \u001b[39m
 \u001b[33mm5.metal         eu-north-1b              $0.917300   \u001b[39m
 \u001b[32mm5.metal         eu-north-1c              $0.917300   \u001b[39m
-\u001b[32m
-Cheapest hourly rate for [m5.metal, m5.24xlarge] is $0.9173 in zone eu-north-1c\u001b[39m
+
+\u001b[32mCheapest hourly rate for [m5.metal, m5.24xlarge] is $0.9173 in zone eu-north-1c\u001b[39m
 `)
-      done()
     })
   })
 })
